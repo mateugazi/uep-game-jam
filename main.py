@@ -2,6 +2,7 @@ import pygame
 import random
 import sys
 import os
+import json
 
 # --- Stałe ---
 SCREEN_WIDTH = 500
@@ -34,6 +35,9 @@ OBSTACLE_CHANCE_PER_FRAME = 0.003
 
 POWER_JUMP_CD = 5.0
 POWER_JUMP_STRENGTH = -20
+
+# --- Plik z rekordem ---
+HIGHSCORE_FILE = "highscore.json"
 
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -81,6 +85,26 @@ def draw_alert(text):
     msg = alert_font.render(text, True, (220, 0, 0))
     screen.blit(msg, (center_x - msg.get_width() // 2, y))
 
+# --- Funkcje obsługujące rekord ---
+def load_highscore():
+    try:
+        with open(HIGHSCORE_FILE, 'r') as f:
+            data = json.load(f)
+        return data.get('highscore', 0)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return 0
+
+def save_highscore(score):
+    try:
+        highscore = load_highscore()
+        if score > highscore:
+            with open(HIGHSCORE_FILE, 'w') as f:
+                json.dump({'highscore': score}, f)
+            return True
+        return False
+    except:
+        return False
+
 # --- Start screen ---
 def show_start_screen():
     bg_img = pygame.transform.scale(START_BG, (SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -101,6 +125,9 @@ def show_start_screen():
     overlay = pygame.Surface((SCREEN_WIDTH - 80, overlay_height), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 170))  # Ciemny, lekko przezroczysty
 
+    # Pobierz rekord
+    highscore = load_highscore()
+    
     while waiting:
         mouse_pos = pygame.mouse.get_pos()
         for event in pygame.event.get():
@@ -126,6 +153,11 @@ def show_start_screen():
             rendered = desc_font.render(line, True, (240, 240, 240))
             screen.blit(rendered, (SCREEN_WIDTH // 2 - rendered.get_width() // 2, y))
             y += 36
+
+        # Wyświetl najlepszy wynik
+        if highscore > 0:
+            highscore_text = desc_font.render(f"Najlepszy wynik: {highscore}", True, (255, 215, 0))
+            screen.blit(highscore_text, (SCREEN_WIDTH // 2 - highscore_text.get_width() // 2, y + 10))
 
         draw_button("START", button_rect, mouse_pos)
 
@@ -352,19 +384,20 @@ def game_loop():
     return score
 
 def show_game_over(score):
-    # --- Altum tło na ekranie końca gry ---
     bg_img = pygame.transform.scale(START_BG, (SCREEN_WIDTH, SCREEN_HEIGHT))
-    button_rect = pygame.Rect(SCREEN_WIDTH//2 - 110, SCREEN_HEIGHT//2 + 30, 220, 50)
-    waiting = True
+    button_rect = pygame.Rect(SCREEN_WIDTH//2 - 110, SCREEN_HEIGHT//2 + 80, 220, 50)  
 
-    # Przygotuj przezroczysty overlay pod napisem KONIEC GRY
     overlay_width = 360
-    overlay_height = 120
+    overlay_height = 240 
     overlay_x = SCREEN_WIDTH // 2 - overlay_width // 2
-    overlay_y = SCREEN_HEIGHT//2 - 100
+    overlay_y = SCREEN_HEIGHT//2 - 120  
 
     overlay = pygame.Surface((overlay_width, overlay_height), pygame.SRCALPHA)
-    overlay.fill((0, 0, 0, 170))  # półprzezroczysty czarny
+    overlay.fill((0, 0, 0, 170)) 
+    
+    # Aktualizuj najwyższy wynik
+    new_highscore = save_highscore(score)
+    highscore = load_highscore()
 
     while waiting:
         mouse_pos = pygame.mouse.get_pos()
@@ -377,7 +410,7 @@ def show_game_over(score):
         over_text = big_font.render("KONIEC GRY", True, (200, 0, 0))
         shadow = big_font.render("KONIEC GRY", True, (0, 0, 0))
         text_x = SCREEN_WIDTH // 2 - over_text.get_width() // 2
-        text_y = SCREEN_HEIGHT // 2 - 90
+        text_y = SCREEN_HEIGHT // 2 - 110  # Moved text up
         # Cień
         screen.blit(shadow, (text_x + 3, text_y + 3))
         # Tekst
@@ -386,6 +419,15 @@ def show_game_over(score):
         # Wynik
         score_text = font.render(f"Twój wynik: {score}", True, WHITE)
         screen.blit(score_text, (SCREEN_WIDTH//2 - score_text.get_width()//2, SCREEN_HEIGHT//2 - 40))
+        
+        # Najwyższy wynik
+        highscore_text = font.render(f"Najlepszy wynik: {highscore}", True, (255, 215, 0))
+        screen.blit(highscore_text, (SCREEN_WIDTH//2 - highscore_text.get_width()//2, SCREEN_HEIGHT//2))
+        
+        # Komunikat o nowym rekordzie
+        if new_highscore:
+            new_record_text = font.render("NOWY REKORD!", True, (255, 215, 0))
+            screen.blit(new_record_text, (SCREEN_WIDTH//2 - new_record_text.get_width()//2, SCREEN_HEIGHT//2 + 40))
 
         draw_button("Zagraj ponownie", button_rect, mouse_pos)
         pygame.display.flip()
