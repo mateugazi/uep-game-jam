@@ -307,7 +307,7 @@ def game_loop():
         score = move_screen(player, platforms, obstacles, score)
 
         # --- Sprawdzanie zmiany tła na taras po przekroczeniu 50 ---
-        if (not using_taras_bg) and (not crossfade) and (score >= 50):
+        if (not using_taras_bg) and (not crossfade) and (score >= 10):
             crossfade = True
             crossfade_timer = 0
 
