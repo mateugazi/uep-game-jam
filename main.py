@@ -32,9 +32,25 @@ pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Endless Jumper")
 clock = pygame.time.Clock()
-font = pygame.font.SysFont('Arial', 28)
-big_font = pygame.font.SysFont('Arial', 42)
-alert_font = pygame.font.SysFont('Arial', 17, bold=True)
+# Font loader z fallbackami
+def get_font(name_list, size, bold=False):
+    for name in name_list:
+        try:
+            return pygame.font.SysFont(name, size, bold=bold)
+        except:
+            continue
+    return pygame.font.SysFont('arial', size, bold=bold)  # ostatnia deska ratunku
+
+NICE_FONTS = [
+    'Fira Sans', 'Nunito', 'Montserrat', 'Comic Sans MS', 'Verdana', 'Arial'
+]
+
+font = get_font(NICE_FONTS, 28)
+big_font = get_font(NICE_FONTS, 48, bold=True)
+alert_font = get_font(NICE_FONTS, 18, bold=True)  # komunikat o cooldownie 2x mniejszy i ładniejszy
+score_font = get_font(NICE_FONTS, 32, bold=True)
+cd_font = get_font(NICE_FONTS, 24, bold=True)
+
 
 def load_image(path, size):
     img = pygame.image.load(path).convert_alpha()
@@ -127,13 +143,12 @@ def draw_button(text, rect, mouse_pos):
     screen.blit(label, label_rect)
 
 def draw_alert(text):
-    alert = alert_font.render(text, True, (255, 0, 0))
-    rect = alert.get_rect(center=(SCREEN_WIDTH // 2, 40))  # Niżej!
-    # biała ramka pod spodem
-    outline = alert_font.render(text, True, (255,255,255))
-    outline_rect = outline.get_rect(center=(SCREEN_WIDTH // 2 + 2, 42))
-    screen.blit(outline, outline_rect)
-    screen.blit(alert, rect)
+    center_x = SCREEN_WIDTH // 2
+    y = 80
+    shadow = alert_font.render(text, True, (40, 40, 40))
+    msg = alert_font.render(text, True, (220, 0, 0))
+    screen.blit(shadow, (center_x - msg.get_width() // 2 + 2, y + 2))
+    screen.blit(msg, (center_x - msg.get_width() // 2, y))
 
 def game_loop():
     player = Player()
@@ -234,13 +249,19 @@ def game_loop():
         player.update()
         screen.fill(WHITE)
         all_sprites.draw(screen)
-        score_text = font.render(f"Wynik: {score}", True, BLACK)
-        screen.blit(score_text, (12, 12))
+        # Wynik (większy, niebieskawy)
+        score_text = score_font.render(f"Wynik: {score}", True, (40, 80, 220))
+        screen.blit(score_text, (14, 14))
 
         cd_left = POWER_JUMP_CD - (current_time - player.last_power_jump)
         if cd_left < 0: cd_left = 0
-        cd_txt = font.render(f"Power Jump CD: {cd_left:.1f}s", True, (80, 80, 240))
-        screen.blit(cd_txt, (SCREEN_WIDTH - cd_txt.get_width() - 16, 12))
+        cd_txt = cd_font.render(f"Power Jump CD: {cd_left:.1f}s", True, (130, 130, 240))
+        screen.blit(cd_txt, (SCREEN_WIDTH - cd_txt.get_width() - 18, 18))
+
+        if show_cooldown_msg:
+            draw_alert("POWER JUMP NA COOLDOWNIE!")
+            if current_time - cooldown_msg_timer > 1.0:
+                show_cooldown_msg = False
 
         if show_cooldown_msg:
             draw_alert("POWER JUMP NA COOLDOWNIE!")
