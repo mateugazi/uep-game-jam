@@ -26,8 +26,8 @@ FPS = 60
 PLATFORM_MIN_DIST = 80
 PLATFORM_MAX_DIST = 140
 
-OBSTACLE_WIDTH = 48
-OBSTACLE_HEIGHT = 48
+OBSTACLE_WIDTH = 80
+OBSTACLE_HEIGHT = 121
 OBSTACLE_CHANCE_PER_FRAME = 0.003
 
 POWER_JUMP_CD = 5.0
@@ -35,8 +35,10 @@ POWER_JUMP_STRENGTH = -20
 
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Endless Jumper")
+pygame.display.set_caption("MISJA UEP")
 clock = pygame.time.Clock()
+WIND_IMG = pygame.image.load(os.path.join('assets', 'background', 'winda.png'))
+
 
 def get_font(name_list, size, bold=False):
     for name in name_list:
@@ -47,7 +49,7 @@ def get_font(name_list, size, bold=False):
     return pygame.font.SysFont('arial', size, bold=bold)
 
 NICE_FONTS = [
-    'Fira Sans', 'Nunito', 'Montserrat', 'Comic Sans MS', 'Verdana', 'Arial'
+ 'Arial Narrow','Montserrat', 'Comic Sans MS', 'Verdana', 'Arial'
 ]
 
 font = get_font(NICE_FONTS, 28)
@@ -80,7 +82,7 @@ def draw_alert(text):
 # --- Start screen ---
 def show_start_screen():
     bg_img = pygame.transform.scale(START_BG, (SCREEN_WIDTH, SCREEN_HEIGHT))
-    title = big_font.render("ENDLESS JUMPER", True, (30, 40, 200))
+    title = big_font.render("MISJA UEP", True, (30, 40, 200))
     welcome_lines = [
         "Doskocz jak najwyżej.",
         "Unikaj spadających wind.",
@@ -172,12 +174,14 @@ class Platform(pygame.sprite.Sprite):
 class Obstacle(pygame.sprite.Sprite):
     def __init__(self, x):
         super().__init__()
-        self.image = pygame.Surface((OBSTACLE_WIDTH, OBSTACLE_HEIGHT))
-        self.image.fill(OBSTACLE_COLOR)
+        self.image = WIND_IMG
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = -OBSTACLE_HEIGHT
         self.speed = random.randint(3, 5)
+
+    def update(self):
+        self.rect.y += self.speed
 
     def update(self):
         self.rect.y += self.speed
@@ -321,13 +325,36 @@ def show_game_over(score):
     button_rect = pygame.Rect(SCREEN_WIDTH//2 - 110, SCREEN_HEIGHT//2 + 30, 220, 50)
     waiting = True
 
+    # Przygotuj przezroczysty overlay pod napisem KONIEC GRY
+    overlay_width = 360
+    overlay_height = 120
+    overlay_x = SCREEN_WIDTH // 2 - overlay_width // 2
+    overlay_y = SCREEN_HEIGHT//2 - 100
+
+    overlay = pygame.Surface((overlay_width, overlay_height), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 170))  # półprzezroczysty czarny
+
     while waiting:
         mouse_pos = pygame.mouse.get_pos()
         screen.blit(bg_img, (0, 0))
+
+        # Czarny overlay pod napisem
+        screen.blit(overlay, (overlay_x, overlay_y))
+
+        # Renderuj cień i główny tekst KONIEC GRY
         over_text = big_font.render("KONIEC GRY", True, (200, 0, 0))
-        score_text = font.render(f"Twój wynik: {score}", True, BLACK)
-        screen.blit(over_text, (SCREEN_WIDTH//2 - over_text.get_width()//2, SCREEN_HEIGHT//2 - 90))
+        shadow = big_font.render("KONIEC GRY", True, (0, 0, 0))
+        text_x = SCREEN_WIDTH // 2 - over_text.get_width() // 2
+        text_y = SCREEN_HEIGHT // 2 - 90
+        # Cień
+        screen.blit(shadow, (text_x + 3, text_y + 3))
+        # Tekst
+        screen.blit(over_text, (text_x, text_y))
+
+        # Wynik
+        score_text = font.render(f"Twój wynik: {score}", True, WHITE)
         screen.blit(score_text, (SCREEN_WIDTH//2 - score_text.get_width()//2, SCREEN_HEIGHT//2 - 40))
+
         draw_button("Zagraj ponownie", button_rect, mouse_pos)
         pygame.display.flip()
 
@@ -338,6 +365,7 @@ def show_game_over(score):
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if button_rect.collidepoint(mouse_pos):
                     waiting = False
+
 
 def main():
     show_start_screen()
