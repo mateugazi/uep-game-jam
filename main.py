@@ -11,6 +11,8 @@ START_BG = pygame.image.load(os.path.join('assets', 'background', 'altum.png'))
 GAME_BG = pygame.image.load(os.path.join('assets', 'background', 'platform_background.png'))
 TARAS_BG = pygame.image.load(os.path.join('assets', 'background', 'taras.png'))
 TARAS_BG = pygame.transform.scale(TARAS_BG, (SCREEN_WIDTH, SCREEN_HEIGHT))
+# --- Ładowanie dźwięków ---
+
 
 PLAYER_WIDTH = 60
 PLAYER_HEIGHT = 60
@@ -36,6 +38,9 @@ POWER_JUMP_CD = 5.0
 POWER_JUMP_STRENGTH = -20
 
 pygame.init()
+pygame.mixer.init()
+JUMP_SOUND = pygame.mixer.Sound(os.path.join('assets', 'sound', 'jump.wav'))
+POWERJUMP_SOUND = pygame.mixer.Sound(os.path.join('assets', 'sound', 'jump2.wav'))
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("MISJA UEP")
 clock = pygame.time.Clock()
@@ -255,6 +260,7 @@ def game_loop():
                     if time_since_last >= POWER_JUMP_CD:
                         player.vel_y = POWER_JUMP_STRENGTH
                         player.last_power_jump = current_time
+                        POWERJUMP_SOUND.play()
                     else:
                         show_cooldown_msg = True
                         cooldown_msg_timer = current_time
@@ -265,6 +271,7 @@ def game_loop():
                 if player.rect.bottom <= hit.rect.bottom + 14:
                     player.rect.bottom = hit.rect.top
                     player.vel_y = -10
+                    JUMP_SOUND.play()
 
         while len(platforms) < 8:
             new_platform = add_next_platform(platforms)
