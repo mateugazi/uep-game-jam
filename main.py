@@ -9,6 +9,8 @@ SCREEN_HEIGHT = 800
 
 START_BG = pygame.image.load(os.path.join('assets', 'background', 'altum.png'))
 GAME_BG = pygame.image.load(os.path.join('assets', 'background', 'platform_background.png'))
+TARAS_BG = pygame.image.load(os.path.join('assets', 'background', 'taras.png'))
+TARAS_BG = pygame.transform.scale(TARAS_BG, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
 PLAYER_WIDTH = 60
 PLAYER_HEIGHT = 60
@@ -232,6 +234,13 @@ def game_loop():
     show_cooldown_msg = False
     cooldown_msg_timer = 0
 
+    # --- TŁO ---
+    using_taras_bg = False
+    crossfade = False
+    crossfade_timer = 0
+    crossfade_duration = 1.0  # sekundy
+    crossfade_progress = 0
+
     while running:
         dt = clock.tick(FPS) / 1000
         current_time = pygame.time.get_ticks() / 1000
@@ -296,11 +305,34 @@ def game_loop():
             running = False
 
         score = move_screen(player, platforms, obstacles, score)
+
+        # --- Sprawdzanie zmiany tła na taras po przekroczeniu 50 ---
+        if (not using_taras_bg) and (not crossfade) and (score >= 50):
+            crossfade = True
+            crossfade_timer = 0
+
         if player.rect.top > SCREEN_HEIGHT:
             running = False
 
         player.update()
-        screen.blit(GAME_BG, (0, 0))  # GAME background (platform_background)
+
+        # --- tło z płynnym przejściem po 50 punktach ---
+        if crossfade:
+            crossfade_timer += dt
+            crossfade_progress = min(crossfade_timer / crossfade_duration, 1.0)
+            base_bg = GAME_BG.copy()
+            taras_bg = TARAS_BG.copy()
+            taras_bg.set_alpha(int(crossfade_progress * 255))
+            screen.blit(base_bg, (0, 0))
+            screen.blit(taras_bg, (0, 0))
+            if crossfade_progress >= 1.0:
+                crossfade = False
+                using_taras_bg = True
+        elif using_taras_bg:
+            screen.blit(TARAS_BG, (0, 0))
+        else:
+            screen.blit(GAME_BG, (0, 0))
+
         all_sprites.draw(screen)
         score_text = score_font.render(f"Wynik: {score}", True, (40, 80, 220))
         screen.blit(score_text, (14, 14))
