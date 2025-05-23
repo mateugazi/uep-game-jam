@@ -246,6 +246,23 @@ def move_screen(player, platforms, obstacles, score):
             obs.rect.y += int(offset)
     return score
 
+def draw_pause_menu():
+    overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 180))
+    screen.blit(overlay, (0, 0))
+    
+    pause_text = big_font.render("PAUZA", True, WHITE)
+    screen.blit(pause_text, (SCREEN_WIDTH // 2 - pause_text.get_width() // 2, SCREEN_HEIGHT // 2 - 100))
+    
+    resume_rect = pygame.Rect(SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 30, 200, 50)
+    quit_rect = pygame.Rect(SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 + 40, 200, 50)
+    
+    mouse_pos = pygame.mouse.get_pos()
+    draw_button("Kontynuuj", resume_rect, mouse_pos)
+    draw_button("Wyjdź", quit_rect, mouse_pos)
+    
+    return resume_rect, quit_rect
+
 def game_loop():
     player = Player()
     platforms = pygame.sprite.Group()
@@ -267,6 +284,7 @@ def game_loop():
     all_sprites.add(obstacles)
 
     running = True
+    paused = False
     score = 0
     show_cooldown_msg = False
     cooldown_msg_timer = 0
@@ -287,7 +305,9 @@ def game_loop():
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_ESCAPE:
+                    paused = not paused
+                elif event.key == pygame.K_SPACE and not paused:
                     time_since_last = current_time - player.last_power_jump
                     if time_since_last >= POWER_JUMP_CD:
                         player.vel_y = POWER_JUMP_STRENGTH
@@ -296,95 +316,106 @@ def game_loop():
                     else:
                         show_cooldown_msg = True
                         cooldown_msg_timer = current_time
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and paused:
+                mouse_pos = pygame.mouse.get_pos()
+                resume_rect, quit_rect = draw_pause_menu()
+                if resume_rect.collidepoint(mouse_pos):
+                    paused = False
+                elif quit_rect.collidepoint(mouse_pos):
+                    return score
 
-        if player.vel_y > 0:
-            hits = pygame.sprite.spritecollide(player, platforms, False)
-            for hit in hits:
-                if player.rect.bottom <= hit.rect.bottom + 14:
-                    player.rect.bottom = hit.rect.top
-                    player.vel_y = -10
-                    JUMP_SOUND.play()
+        if not paused:
+            if player.vel_y > 0:
+                hits = pygame.sprite.spritecollide(player, platforms, False)
+                for hit in hits:
+                    if player.rect.bottom <= hit.rect.bottom + 14:
+                        player.rect.bottom = hit.rect.top
+                        player.vel_y = -10
+                        JUMP_SOUND.play()
 
-        while len(platforms) < 8:
-            new_platform = add_next_platform(platforms)
-            all_sprites.add(new_platform)
+            while len(platforms) < 8:
+                new_platform = add_next_platform(platforms)
+                all_sprites.add(new_platform)
 
-        if random.random() < OBSTACLE_CHANCE_PER_FRAME:
-            if player.rect.top < SCREEN_HEIGHT // 4:
-                safe_margin = 30
-                safe_left = max(0, player.rect.left - safe_margin)
-                safe_right = min(SCREEN_WIDTH, player.rect.right + safe_margin)
-                possible_ranges = []
-                if safe_left > 0:
-                    left_range = (0, safe_left - OBSTACLE_WIDTH)
-                    if left_range[1] > left_range[0]:
-                        possible_ranges.append(left_range)
-                if safe_right < SCREEN_WIDTH:
-                    right_range = (safe_right, SCREEN_WIDTH - OBSTACLE_WIDTH)
-                    if right_range[1] > right_range[0]:
-                        possible_ranges.append(right_range)
-                if possible_ranges:
-                    spawn_range = random.choice(possible_ranges)
-                    obs_x = random.randint(*spawn_range)
+            if random.random() < OBSTACLE_CHANCE_PER_FRAME:
+                if player.rect.top < SCREEN_HEIGHT // 4:
+                    safe_margin = 30
+                    safe_left = max(0, player.rect.left - safe_margin)
+                    safe_right = min(SCREEN_WIDTH, player.rect.right + safe_margin)
+                    possible_ranges = []
+                    if safe_left > 0:
+                        left_range = (0, safe_left - OBSTACLE_WIDTH)
+                        if left_range[1] > left_range[0]:
+                            possible_ranges.append(left_range)
+                    if safe_right < SCREEN_WIDTH:
+                        right_range = (safe_right, SCREEN_WIDTH - OBSTACLE_WIDTH)
+                        if right_range[1] > right_range[0]:
+                            possible_ranges.append(right_range)
+                    if possible_ranges:
+                        spawn_range = random.choice(possible_ranges)
+                        obs_x = random.randint(*spawn_range)
+                        obstacle = Obstacle(obs_x)
+                        obstacles.add(obstacle)
+                        all_sprites.add(obstacle)
+                else:
+                    obs_x = random.randint(0, SCREEN_WIDTH - OBSTACLE_WIDTH)
                     obstacle = Obstacle(obs_x)
                     obstacles.add(obstacle)
                     all_sprites.add(obstacle)
+
+            obstacles.update()
+            for obs in list(obstacles):
+                if obs.rect.top > SCREEN_HEIGHT:
+                    obs.kill()
+
+            if pygame.sprite.spritecollide(player, obstacles, False):
+                running = False
+
+            score = move_screen(player, platforms, obstacles, score)
+
+            # --- Sprawdzanie zmiany tła na taras po przekroczeniu 50 ---
+            if (not using_taras_bg) and (not crossfade) and (score >= 10):
+                crossfade = True
+                crossfade_timer = 0
+
+            if player.rect.top > SCREEN_HEIGHT:
+                running = False
+
+            player.update()
+
+            # --- tło z płynnym przejściem po 50 punktach ---
+            if crossfade:
+                crossfade_timer += dt
+                crossfade_progress = min(crossfade_timer / crossfade_duration, 1.0)
+                base_bg = GAME_BG.copy()
+                taras_bg = TARAS_BG.copy()
+                taras_bg.set_alpha(int(crossfade_progress * 255))
+                screen.blit(base_bg, (0, 0))
+                screen.blit(taras_bg, (0, 0))
+                if crossfade_progress >= 1.0:
+                    crossfade = False
+                    using_taras_bg = True
+            elif using_taras_bg:
+                screen.blit(TARAS_BG, (0, 0))
             else:
-                obs_x = random.randint(0, SCREEN_WIDTH - OBSTACLE_WIDTH)
-                obstacle = Obstacle(obs_x)
-                obstacles.add(obstacle)
-                all_sprites.add(obstacle)
+                screen.blit(GAME_BG, (0, 0))
 
-        obstacles.update()
-        for obs in list(obstacles):
-            if obs.rect.top > SCREEN_HEIGHT:
-                obs.kill()
+            all_sprites.draw(screen)
+            score_text = score_font.render(f"Wynik: {score}", True, (40, 80, 220))
+            screen.blit(score_text, (14, 14))
 
-        if pygame.sprite.spritecollide(player, obstacles, False):
-            running = False
+            cd_left = POWER_JUMP_CD - (current_time - player.last_power_jump)
+            if cd_left < 0: cd_left = 0
+            cd_txt = cd_font.render(f"Power Jump CD: {cd_left:.1f}s", True, (130, 130, 240))
+            screen.blit(cd_txt, (SCREEN_WIDTH - cd_txt.get_width() - 18, 18))
 
-        score = move_screen(player, platforms, obstacles, score)
+            if show_cooldown_msg:
+                draw_alert("POWER JUMP NA COOLDOWNIE!")
+                if current_time - cooldown_msg_timer > 1.0:
+                    show_cooldown_msg = False
 
-        # --- Sprawdzanie zmiany tła na taras po przekroczeniu 50 ---
-        if (not using_taras_bg) and (not crossfade) and (score >= 10):
-            crossfade = True
-            crossfade_timer = 0
-
-        if player.rect.top > SCREEN_HEIGHT:
-            running = False
-
-        player.update()
-
-        # --- tło z płynnym przejściem po 50 punktach ---
-        if crossfade:
-            crossfade_timer += dt
-            crossfade_progress = min(crossfade_timer / crossfade_duration, 1.0)
-            base_bg = GAME_BG.copy()
-            taras_bg = TARAS_BG.copy()
-            taras_bg.set_alpha(int(crossfade_progress * 255))
-            screen.blit(base_bg, (0, 0))
-            screen.blit(taras_bg, (0, 0))
-            if crossfade_progress >= 1.0:
-                crossfade = False
-                using_taras_bg = True
-        elif using_taras_bg:
-            screen.blit(TARAS_BG, (0, 0))
-        else:
-            screen.blit(GAME_BG, (0, 0))
-
-        all_sprites.draw(screen)
-        score_text = score_font.render(f"Wynik: {score}", True, (40, 80, 220))
-        screen.blit(score_text, (14, 14))
-
-        cd_left = POWER_JUMP_CD - (current_time - player.last_power_jump)
-        if cd_left < 0: cd_left = 0
-        cd_txt = cd_font.render(f"Power Jump CD: {cd_left:.1f}s", True, (130, 130, 240))
-        screen.blit(cd_txt, (SCREEN_WIDTH - cd_txt.get_width() - 18, 18))
-
-        if show_cooldown_msg:
-            draw_alert("POWER JUMP NA COOLDOWNIE!")
-            if current_time - cooldown_msg_timer > 1.0:
-                show_cooldown_msg = False
+        if paused:
+            draw_pause_menu()
 
         pygame.display.flip()
 
