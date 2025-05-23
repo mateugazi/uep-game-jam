@@ -23,7 +23,7 @@ PLATFORM_MAX_DIST = 140
 
 OBSTACLE_WIDTH = 48
 OBSTACLE_HEIGHT = 48
-OBSTACLE_CHANCE_PER_FRAME = 0.009  # Mniej przeszkód!
+OBSTACLE_CHANCE_PER_FRAME = 0.003  # Mniej przeszkód!
 
 POWER_JUMP_CD = 5.0  # sekundy
 POWER_JUMP_STRENGTH = -20  # dwa razy większy skok
@@ -145,9 +145,7 @@ def draw_button(text, rect, mouse_pos):
 def draw_alert(text):
     center_x = SCREEN_WIDTH // 2
     y = 80
-    shadow = alert_font.render(text, True, (40, 40, 40))
     msg = alert_font.render(text, True, (220, 0, 0))
-    screen.blit(shadow, (center_x - msg.get_width() // 2 + 2, y + 2))
     screen.blit(msg, (center_x - msg.get_width() // 2, y))
 
 def game_loop():
