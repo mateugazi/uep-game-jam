@@ -43,6 +43,9 @@ HIGHSCORE_FILE = "highscore.json"
 
 pygame.init()
 pygame.mixer.init()
+pygame.mixer.music.load(os.path.join('assets', 'sound', 'muzyka.wav'))
+pygame.mixer.music.set_volume(0.2)  # Głośność (0.0 - 1.0)
+pygame.mixer.music.play(-1)         # -1 = zapętlona muzyka
 JUMP_SOUND = pygame.mixer.Sound(os.path.join('assets', 'sound', 'jump.wav'))
 POWERJUMP_SOUND = pygame.mixer.Sound(os.path.join('assets', 'sound', 'jump2.wav'))
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -123,6 +126,15 @@ def show_start_screen():
         "Kliknij START, aby rozpocząć!"
     ]
     button_rect = pygame.Rect(SCREEN_WIDTH//2 - 100, SCREEN_HEIGHT//2 + 130, 200, 54)
+
+    # --- Slider ---
+    slider_x = SCREEN_WIDTH//2 - 120
+    slider_y = SCREEN_HEIGHT//2 + 250
+    slider_w = 240
+    slider_h = 8
+    knob_r = 14  # promień "gałki"
+    dragging = False
+
     waiting = True
 
     # Przygotuj przezroczysty overlay pod tekst instrukcji
@@ -130,9 +142,13 @@ def show_start_screen():
     overlay = pygame.Surface((SCREEN_WIDTH - 80, overlay_height), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 170))  # Ciemny, lekko przezroczysty
 
+    def get_knob_pos(vol):
+        # vol: 0.0-1.0, slider_w: px
+        return int(slider_x + vol * slider_w)
+
     # Pobierz rekord
     highscore = load_highscore()
-    
+
     while waiting:
         mouse_pos = pygame.mouse.get_pos()
         for event in pygame.event.get():
@@ -140,8 +156,22 @@ def show_start_screen():
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # Start drag jeśli kliknięto na "gałkę" lub pasek
+                vol = pygame.mixer.music.get_volume()
+                knob_x = get_knob_pos(vol)
+                knob_rect = pygame.Rect(knob_x - knob_r, slider_y - knob_r, knob_r * 2, knob_r * 2)
+                slider_rect = pygame.Rect(slider_x, slider_y - slider_h//2, slider_w, slider_h * 2)
+                if knob_rect.collidepoint(mouse_pos) or slider_rect.collidepoint(mouse_pos):
+                    dragging = True
                 if button_rect.collidepoint(mouse_pos):
                     waiting = False
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                dragging = False
+            elif event.type == pygame.MOUSEMOTION and dragging:
+                # Przestawianie głośności myszką po sliderze
+                mouse_x = max(slider_x, min(slider_x + slider_w, mouse_pos[0]))
+                new_vol = (mouse_x - slider_x) / slider_w
+                pygame.mixer.music.set_volume(new_vol)
 
         screen.blit(bg_img, (0, 0))
 
@@ -165,6 +195,23 @@ def show_start_screen():
             screen.blit(highscore_text, (SCREEN_WIDTH // 2 - highscore_text.get_width() // 2, y + 10))
 
         draw_button("START", button_rect, mouse_pos)
+
+        # --- SLIDER ---
+        vol = pygame.mixer.music.get_volume()
+        # Slider track
+        pygame.draw.rect(screen, (220, 220, 220), (slider_x, slider_y - slider_h//2, slider_w, slider_h), border_radius=4)
+        # Slider fill (aktualna głośność)
+        pygame.draw.rect(screen, (50, 180, 220), (slider_x, slider_y - slider_h//2, int(vol * slider_w), slider_h), border_radius=4)
+        # Knob
+        knob_x = get_knob_pos(vol)
+        pygame.draw.circle(screen, (60, 140, 210), (knob_x, slider_y), knob_r)
+        pygame.draw.circle(screen, (255,255,255), (knob_x, slider_y), knob_r-6)
+        # Obwódka
+        pygame.draw.circle(screen, (80,80,80), (knob_x, slider_y), knob_r, 2)
+
+        # Tekst nad sliderem i wartość procentowa
+        vol_text = font.render(f"Głośność muzyki: {int(vol*100)}%", True, WHITE)
+        screen.blit(vol_text, (SCREEN_WIDTH//2 - vol_text.get_width()//2, slider_y +10 ))
 
         pygame.display.flip()
         clock.tick(60)
@@ -423,17 +470,17 @@ def game_loop():
 
 def show_game_over(score):
     bg_img = pygame.transform.scale(START_BG, (SCREEN_WIDTH, SCREEN_HEIGHT))
-    button_rect = pygame.Rect(SCREEN_WIDTH//2 - 110, SCREEN_HEIGHT//2 + 80, 220, 50)  
+    button_rect = pygame.Rect(SCREEN_WIDTH//2 - 110, SCREEN_HEIGHT//2 + 80, 220, 50)
     waiting = True
 
     overlay_width = 360
-    overlay_height = 240 
+    overlay_height = 240
     overlay_x = SCREEN_WIDTH // 2 - overlay_width // 2
-    overlay_y = SCREEN_HEIGHT//2 - 120  
+    overlay_y = SCREEN_HEIGHT//2 - 120
 
     overlay = pygame.Surface((overlay_width, overlay_height), pygame.SRCALPHA)
-    overlay.fill((0, 0, 0, 170)) 
-    
+    overlay.fill((0, 0, 0, 170))
+
     new_highscore = save_highscore(score)
     highscore = load_highscore()
 
@@ -452,10 +499,10 @@ def show_game_over(score):
 
         score_text = font.render(f"Twój wynik: {score}", True, WHITE)
         screen.blit(score_text, (SCREEN_WIDTH//2 - score_text.get_width()//2, SCREEN_HEIGHT//2 - 40))
-        
+
         highscore_text = font.render(f"Najlepszy wynik: {highscore}", True, (255, 215, 0))
         screen.blit(highscore_text, (SCREEN_WIDTH//2 - highscore_text.get_width()//2, SCREEN_HEIGHT//2))
-        
+
         if new_highscore:
             new_record_text = font.render("NOWY REKORD!", True, (255, 215, 0))
             screen.blit(new_record_text, (SCREEN_WIDTH//2 - new_record_text.get_width()//2, SCREEN_HEIGHT//2 + 40))
