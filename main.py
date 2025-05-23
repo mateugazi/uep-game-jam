@@ -12,8 +12,6 @@ START_BG = pygame.image.load(os.path.join('assets', 'background', 'altum.png'))
 GAME_BG = pygame.image.load(os.path.join('assets', 'background', 'platform_background.png'))
 TARAS_BG = pygame.image.load(os.path.join('assets', 'background', 'taras.png'))
 TARAS_BG = pygame.transform.scale(TARAS_BG, (SCREEN_WIDTH, SCREEN_HEIGHT))
-# --- Ładowanie dźwięków ---
-
 
 PLAYER_WIDTH = 60
 PLAYER_HEIGHT = 60
@@ -35,17 +33,32 @@ OBSTACLE_WIDTH = 80
 OBSTACLE_HEIGHT = 121
 OBSTACLE_CHANCE_PER_FRAME = 0.003
 
-POWER_JUMP_CD = 5.0
-POWER_JUMP_STRENGTH = -20
-
 # --- Plik z rekordem ---
 HIGHSCORE_FILE = "highscore.json"
+
+# --- Definicja postaci (dostępne wybory) ---
+CHARACTERS = [
+    {
+        "name": "Klasyczny",
+        "spirit": os.path.join('assets', 'hero', 'hero_spirit.png'),
+        "jump": os.path.join('assets', 'hero', 'hero_jump.png'),
+        "power_jump_strength": -20,
+        "power_jump_cd": 5.0
+    },
+    {
+        "name": "Lewusek 2.0",
+        "spirit": os.path.join('assets', 'hero', 'hero_spirit2.png'),
+        "jump": os.path.join('assets', 'hero', 'hero_jump2.png'),
+        "power_jump_strength": -26,  # wyżej skacze!
+        "power_jump_cd": 7.0  # dłuższy cooldown!
+    }
+]
 
 pygame.init()
 pygame.mixer.init()
 pygame.mixer.music.load(os.path.join('assets', 'sound', 'muzyka.wav'))
 pygame.mixer.music.set_volume(0.2)  # Głośność (0.0 - 1.0)
-pygame.mixer.music.play(-1)         # -1 = zapętlona muzyka
+pygame.mixer.music.play(-1)  # -1 = zapętlona muzyka
 JUMP_SOUND = pygame.mixer.Sound(os.path.join('assets', 'sound', 'jump.wav'))
 POWERJUMP_SOUND = pygame.mixer.Sound(os.path.join('assets', 'sound', 'jump2.wav'))
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -62,8 +75,9 @@ def get_font(name_list, size, bold=False):
             continue
     return pygame.font.SysFont('arial', size, bold=bold)
 
+
 NICE_FONTS = [
- 'Arial Narrow','Montserrat', 'Comic Sans MS', 'Verdana', 'Arial'
+    'Arial Narrow', 'Montserrat', 'Comic Sans MS', 'Verdana', 'Arial'
 ]
 
 font = get_font(NICE_FONTS, 28)
@@ -73,12 +87,11 @@ score_font = get_font(NICE_FONTS, 32, bold=True)
 cd_font = get_font(NICE_FONTS, 24, bold=True)
 desc_font = get_font(NICE_FONTS, 23)
 
+
 def load_image(path, size):
     img = pygame.image.load(path).convert_alpha()
     return pygame.transform.scale(img, size)
 
-SPIRIT_IMG = load_image(os.path.join('assets', 'hero', 'hero_spirit.png'), (PLAYER_WIDTH, PLAYER_HEIGHT))
-JUMP_IMG = load_image(os.path.join('assets', 'hero', 'hero_jump.png'), (PLAYER_WIDTH, PLAYER_HEIGHT))
 
 def draw_button(text, rect, mouse_pos):
     color = BUTTON_HOVER if rect.collidepoint(mouse_pos) else BUTTON_COLOR
@@ -87,11 +100,13 @@ def draw_button(text, rect, mouse_pos):
     label_rect = label.get_rect(center=rect.center)
     screen.blit(label, label_rect)
 
+
 def draw_alert(text):
     center_x = SCREEN_WIDTH // 2
     y = 80
     msg = alert_font.render(text, True, (220, 0, 0))
     screen.blit(msg, (center_x - msg.get_width() // 2, y))
+
 
 # --- Funkcje obsługujące rekord ---
 def load_highscore():
@@ -101,6 +116,7 @@ def load_highscore():
         return data.get('highscore', 0)
     except (FileNotFoundError, json.JSONDecodeError):
         return 0
+
 
 def save_highscore(score):
     try:
@@ -113,42 +129,47 @@ def save_highscore(score):
     except:
         return False
 
-# --- Start screen ---
+
+# --- Start screen z wyborem postaci i sliderem ---
 def show_start_screen():
     bg_img = pygame.transform.scale(START_BG, (SCREEN_WIDTH, SCREEN_HEIGHT))
     title = big_font.render("MISJA UEP", True, (30, 40, 200))
     welcome_lines = [
         "Doskocz jak najwyżej.",
         "Unikaj spadających wind.",
-        "Sterowanie:",
-        "  strzałki — poruszanie się",
-        "  SPACJA — Power Jump (co 5 sek.)",
-        "Kliknij START, aby rozpocząć!"
+        "Sterowanie: strzałki — poruszanie się.",
+        "SPACJA — Power Jump (co 5 sek.)",
     ]
-    button_rect = pygame.Rect(SCREEN_WIDTH//2 - 100, SCREEN_HEIGHT//2 + 130, 200, 54)
+    button_rect = pygame.Rect(SCREEN_WIDTH // 2 - 100, 590, 200, 54)
 
     # --- Slider ---
-    slider_x = SCREEN_WIDTH//2 - 120
-    slider_y = SCREEN_HEIGHT//2 + 250
+    slider_x = SCREEN_WIDTH // 2 - 120
+    slider_y = 730
     slider_w = 240
     slider_h = 8
-    knob_r = 14  # promień "gałki"
+    knob_r = 14
     dragging = False
 
-    waiting = True
+    # --- Wybór postaci ---
+    selected_char = 0
+    char_rects = []
+    char_preview_y = 410
+    char_preview_spacing = 180
 
-    # Przygotuj przezroczysty overlay pod tekst instrukcji
-    overlay_height = len(welcome_lines) * 36 + 30
-    overlay = pygame.Surface((SCREEN_WIDTH - 80, overlay_height), pygame.SRCALPHA)
-    overlay.fill((0, 0, 0, 170))  # Ciemny, lekko przezroczysty
+    overlay_height = len(welcome_lines) * 36 + 32
+    overlay = pygame.Surface((SCREEN_WIDTH - 70, overlay_height), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 175))
+
+    highscore = load_highscore()
+    char_images = []
+    for c in CHARACTERS:
+        s = load_image(c["spirit"], (PLAYER_WIDTH, PLAYER_HEIGHT))
+        char_images.append(s)
 
     def get_knob_pos(vol):
-        # vol: 0.0-1.0, slider_w: px
         return int(slider_x + vol * slider_w)
 
-    # Pobierz rekord
-    highscore = load_highscore()
-
+    waiting = True
     while waiting:
         mouse_pos = pygame.mouse.get_pos()
         for event in pygame.event.get():
@@ -156,166 +177,204 @@ def show_start_screen():
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                # Start drag jeśli kliknięto na "gałkę" lub pasek
                 vol = pygame.mixer.music.get_volume()
                 knob_x = get_knob_pos(vol)
                 knob_rect = pygame.Rect(knob_x - knob_r, slider_y - knob_r, knob_r * 2, knob_r * 2)
-                slider_rect = pygame.Rect(slider_x, slider_y - slider_h//2, slider_w, slider_h * 2)
+                slider_rect = pygame.Rect(slider_x, slider_y - slider_h // 2, slider_w, slider_h * 2)
                 if knob_rect.collidepoint(mouse_pos) or slider_rect.collidepoint(mouse_pos):
                     dragging = True
+                for idx, rect in enumerate(char_rects):
+                    if rect.collidepoint(mouse_pos):
+                        selected_char = idx
                 if button_rect.collidepoint(mouse_pos):
                     waiting = False
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                 dragging = False
             elif event.type == pygame.MOUSEMOTION and dragging:
-                # Przestawianie głośności myszką po sliderze
                 mouse_x = max(slider_x, min(slider_x + slider_w, mouse_pos[0]))
                 new_vol = (mouse_x - slider_x) / slider_w
                 pygame.mixer.music.set_volume(new_vol)
 
         screen.blit(bg_img, (0, 0))
-
         # Tytuł
-        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 60))
-
-        # Czarny overlay pod tekst
-        overlay_y = 200
-        screen.blit(overlay, (40, overlay_y - 12))
+        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 35))
 
         # Instrukcje
-        y = overlay_y
+        screen.blit(overlay, (35, 120))
+        y = 140
         for line in welcome_lines:
             rendered = desc_font.render(line, True, (240, 240, 240))
             screen.blit(rendered, (SCREEN_WIDTH // 2 - rendered.get_width() // 2, y))
-            y += 36
+            y += 34
 
-        # Wyświetl najlepszy wynik
+        # Najlepszy wynik
         if highscore > 0:
             highscore_text = desc_font.render(f"Najlepszy wynik: {highscore}", True, (255, 215, 0))
-            screen.blit(highscore_text, (SCREEN_WIDTH // 2 - highscore_text.get_width() // 2, y + 10))
+            screen.blit(highscore_text, (SCREEN_WIDTH // 2 - highscore_text.get_width() // 2, 260))
 
+        # --- Wybór postaci ---
+        char_rects = []
+        cx = SCREEN_WIDTH // 2 - ((len(CHARACTERS) - 1) * char_preview_spacing) // 2
+        for idx, c in enumerate(CHARACTERS):
+            r = pygame.Rect(cx + idx * char_preview_spacing - 45, char_preview_y - 15, 90, 110)
+            char_rects.append(r)
+            # Overlay pod każdą postacią
+            char_overlay = pygame.Surface((90, 110), pygame.SRCALPHA)
+            char_overlay.fill((15, 15, 18, 170))
+            screen.blit(char_overlay, (r.x, r.y))
+            pygame.draw.rect(screen, (120, 120, 120) if idx != selected_char else (30, 180, 50), r, border_radius=20, width=6 if idx == selected_char else 2)
+            # Obrazek postaci
+            img = char_images[idx]
+            screen.blit(img, (r.x + (r.width - PLAYER_WIDTH) // 2, r.y + 12))
+            # Nazwa postaci
+            name = desc_font.render(CHARACTERS[idx]["name"], True, (255, 255, 255))
+            screen.blit(name, (r.x + (r.width - name.get_width()) // 2, r.y + 66))
+            # Parametry
+            param = desc_font.render(
+                f'Skok: {"++" if c["power_jump_strength"] < -22 else "+"}, CD: {c["power_jump_cd"]}s', True,
+                (255, 220, 255))
+            screen.blit(param, (r.x + (r.width - param.get_width()) // 2, r.y + 88))
+
+        # Przycisk START
         draw_button("START", button_rect, mouse_pos)
 
-        # --- SLIDER ---
+        # --- Slider --- (duży ciemny overlay pod całością)
+        slider_overlay = pygame.Surface((slider_w + 88, 90), pygame.SRCALPHA)
+        slider_overlay.fill((0, 0, 0, 195))
+        screen.blit(slider_overlay, (slider_x - 44, slider_y - 50))
+        vol_big_font = get_font(NICE_FONTS, 32, bold=True)
         vol = pygame.mixer.music.get_volume()
-        # Slider track
-        pygame.draw.rect(screen, (220, 220, 220), (slider_x, slider_y - slider_h//2, slider_w, slider_h), border_radius=4)
-        # Slider fill (aktualna głośność)
-        pygame.draw.rect(screen, (50, 180, 220), (slider_x, slider_y - slider_h//2, int(vol * slider_w), slider_h), border_radius=4)
-        # Knob
-        knob_x = get_knob_pos(vol)
-        pygame.draw.circle(screen, (60, 140, 210), (knob_x, slider_y), knob_r)
-        pygame.draw.circle(screen, (255,255,255), (knob_x, slider_y), knob_r-6)
-        # Obwódka
-        pygame.draw.circle(screen, (80,80,80), (knob_x, slider_y), knob_r, 2)
-
-        # Tekst nad sliderem i wartość procentowa
-        vol_text = font.render(f"Głośność muzyki: {int(vol*100)}%", True, WHITE)
-        screen.blit(vol_text, (SCREEN_WIDTH//2 - vol_text.get_width()//2, slider_y +10 ))
+        vol_text = vol_big_font.render(f"Głośność muzyki: {int(vol * 100)}%", True, (255, 255, 255))
+        shadow = vol_big_font.render(f"Głośność muzyki: {int(vol * 100)}%", True, (30, 30, 30))
+        shadow_x = SCREEN_WIDTH // 2 - vol_text.get_width() // 2 + 2
+        shadow_y = slider_y - 38 + 2
+        screen.blit(shadow, (shadow_x, shadow_y))
+        screen.blit(vol_text, (SCREEN_WIDTH // 2 - vol_text.get_width() // 2, slider_y - 38))
+        quiet_icon = font.render("🔈", True, (180, 220, 255))
+        loud_icon = font.render("🔊", True, (180, 220, 255))
+        screen.blit(quiet_icon, (slider_x - 35, slider_y - 10))
+        screen.blit(loud_icon, (slider_x + slider_w + 8, slider_y - 10))
+        pygame.draw.rect(screen, (230, 230, 255), (slider_x, slider_y - slider_h // 2, slider_w, slider_h + 2), border_radius=6)
+        pygame.draw.rect(screen, (60, 200, 255), (slider_x, slider_y - slider_h // 2, int(vol * slider_w), slider_h + 2), border_radius=6)
+        pygame.draw.rect(screen, (30, 30, 60), (slider_x, slider_y - slider_h // 2, slider_w, slider_h + 2), 2, border_radius=6)
+        knob_x = int(slider_x + vol * slider_w)
+        pygame.draw.circle(screen, (40, 160, 255), (knob_x, slider_y + 1), knob_r + 2)
+        pygame.draw.circle(screen, (255, 255, 255), (knob_x, slider_y + 1), knob_r - 4)
+        pygame.draw.circle(screen, (80, 80, 110), (knob_x, slider_y + 1), knob_r + 2, 3)
 
         pygame.display.flip()
         clock.tick(60)
 
-class Player(pygame.sprite.Sprite):
-    def __init__(self):
-        super().__init__()
-        self.images = {
-            "spirit": SPIRIT_IMG,
-            "jump": JUMP_IMG
-        }
-        self.image = self.images["spirit"]
-        self.rect = self.image.get_rect()
-        self.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150)
-        self.vel_y = 0
-        self.last_power_jump = -POWER_JUMP_CD
+    return selected_char
 
-    def update(self):
-        self.vel_y += 0.4
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_LEFT]:
-            self.rect.x -= 7
-        if keys[pygame.K_RIGHT]:
-            self.rect.x += 7
 
-        if self.rect.right > SCREEN_WIDTH:
-            self.rect.left = 0
-        elif self.rect.left < 0:
-            self.rect.right = SCREEN_WIDTH
-
-        self.rect.y += int(self.vel_y)
-
-        if self.vel_y < 0:
-            self.image = self.images["jump"]
-        else:
-            self.image = self.images["spirit"]
-
-class Platform(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        super().__init__()
-        self.image = PLATFORM_IMG
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
-
-class Obstacle(pygame.sprite.Sprite):
-    def __init__(self, x):
-        super().__init__()
-        self.image = WIND_IMG
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = -OBSTACLE_HEIGHT
-        self.speed = random.randint(3, 5)
-
-    def update(self):
-        self.rect.y += self.speed
-
-    def update(self):
-        self.rect.y += self.speed
-
-def add_next_platform(platforms):
-    highest = min(platform.rect.y for platform in platforms)
-    new_y = highest - random.randint(PLATFORM_MIN_DIST, PLATFORM_MAX_DIST)
-    new_x = random.randint(0, SCREEN_WIDTH - PLATFORM_WIDTH)
-    new_platform = Platform(new_x, new_y)
-    platforms.add(new_platform)
-    return new_platform
-
-def move_screen(player, platforms, obstacles, score):
-    if player.rect.top <= SCREEN_HEIGHT // 4:
-        offset = abs(player.vel_y)
-        player.rect.y += int(offset)
-        for plat in platforms:
-            plat.rect.y += int(offset)
-            if plat.rect.top >= SCREEN_HEIGHT:
-                plat.kill()
-                score += 1
-        for obs in obstacles:
-            obs.rect.y += int(offset)
-    return score
-
+# --- Pause menu ---
 def draw_pause_menu():
     overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 180))
     screen.blit(overlay, (0, 0))
-    
+
     pause_text = big_font.render("PAUZA", True, WHITE)
     screen.blit(pause_text, (SCREEN_WIDTH // 2 - pause_text.get_width() // 2, SCREEN_HEIGHT // 2 - 100))
-    
+
     resume_rect = pygame.Rect(SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 30, 200, 50)
     quit_rect = pygame.Rect(SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 + 40, 200, 50)
-    
+
     mouse_pos = pygame.mouse.get_pos()
     draw_button("Kontynuuj", resume_rect, mouse_pos)
     draw_button("Wyjdź", quit_rect, mouse_pos)
-    
+
     return resume_rect, quit_rect
 
-def game_loop():
+
+# --- Gra główna, uwzględnia wybraną postać! ---
+def game_loop(selected_char):
+    # Załaduj sprite'y i parametry dla wybranej postaci
+    char = CHARACTERS[selected_char]
+    spirit_img = load_image(char["spirit"], (PLAYER_WIDTH, PLAYER_HEIGHT))
+    jump_img = load_image(char["jump"], (PLAYER_WIDTH, PLAYER_HEIGHT))
+    power_jump_strength = char["power_jump_strength"]
+    power_jump_cd = char["power_jump_cd"]
+
+    class Player(pygame.sprite.Sprite):
+        def __init__(self):
+            super().__init__()
+            self.images = {
+                "spirit": spirit_img,
+                "jump": jump_img
+            }
+            self.image = self.images["spirit"]
+            self.rect = self.image.get_rect()
+            self.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150)
+            self.vel_y = 0
+            self.last_power_jump = -power_jump_cd
+
+        def update(self):
+            self.vel_y += 0.4
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT]:
+                self.rect.x -= 7
+            if keys[pygame.K_RIGHT]:
+                self.rect.x += 7
+
+            if self.rect.right > SCREEN_WIDTH:
+                self.rect.left = 0
+            elif self.rect.left < 0:
+                self.rect.right = SCREEN_WIDTH
+
+            self.rect.y += int(self.vel_y)
+
+            if self.vel_y < 0:
+                self.image = self.images["jump"]
+            else:
+                self.image = self.images["spirit"]
+
+    class Platform(pygame.sprite.Sprite):
+        def __init__(self, x, y):
+            super().__init__()
+            self.image = PLATFORM_IMG
+            self.rect = self.image.get_rect()
+            self.rect.x = x
+            self.rect.y = y
+
+    class Obstacle(pygame.sprite.Sprite):
+        def __init__(self, x):
+            super().__init__()
+            self.image = WIND_IMG
+            self.rect = self.image.get_rect()
+            self.rect.x = x
+            self.rect.y = -OBSTACLE_HEIGHT
+            self.speed = random.randint(3, 5)
+
+        def update(self):
+            self.rect.y += self.speed
+
+    def add_next_platform(platforms):
+        highest = min(platform.rect.y for platform in platforms)
+        new_y = highest - random.randint(PLATFORM_MIN_DIST, PLATFORM_MAX_DIST)
+        new_x = random.randint(0, SCREEN_WIDTH - PLATFORM_WIDTH)
+        new_platform = Platform(new_x, new_y)
+        platforms.add(new_platform)
+        return new_platform
+
+    def move_screen(player, platforms, obstacles, score):
+        if player.rect.top <= SCREEN_HEIGHT // 4:
+            offset = abs(player.vel_y)
+            player.rect.y += int(offset)
+            for plat in platforms:
+                plat.rect.y += int(offset)
+                if plat.rect.top >= SCREEN_HEIGHT:
+                    plat.kill()
+                    score += 1
+            for obs in obstacles:
+                obs.rect.y += int(offset)
+        return score
+
     player = Player()
     platforms = pygame.sprite.Group()
     obstacles = pygame.sprite.Group()
 
-    base = Platform(SCREEN_WIDTH//2 - PLATFORM_WIDTH//2, SCREEN_HEIGHT - 60)
+    base = Platform(SCREEN_WIDTH // 2 - PLATFORM_WIDTH // 2, SCREEN_HEIGHT - 60)
     platforms.add(base)
     last_y = SCREEN_HEIGHT - 60
 
@@ -356,8 +415,8 @@ def game_loop():
                     paused = not paused
                 elif event.key == pygame.K_SPACE and not paused:
                     time_since_last = current_time - player.last_power_jump
-                    if time_since_last >= POWER_JUMP_CD:
-                        player.vel_y = POWER_JUMP_STRENGTH
+                    if time_since_last >= power_jump_cd:
+                        player.vel_y = power_jump_strength
                         player.last_power_jump = current_time
                         POWERJUMP_SOUND.play()
                     else:
@@ -421,7 +480,7 @@ def game_loop():
             score = move_screen(player, platforms, obstacles, score)
 
             # --- Sprawdzanie zmiany tła na taras po przekroczeniu 50 ---
-            if (not using_taras_bg) and (not crossfade) and (score >= 10):
+            if (not using_taras_bg) and (not crossfade) and (score >= 50):
                 crossfade = True
                 crossfade_timer = 0
 
@@ -451,7 +510,7 @@ def game_loop():
             score_text = score_font.render(f"Wynik: {score}", True, (40, 80, 220))
             screen.blit(score_text, (14, 14))
 
-            cd_left = POWER_JUMP_CD - (current_time - player.last_power_jump)
+            cd_left = power_jump_cd - (current_time - player.last_power_jump)
             if cd_left < 0: cd_left = 0
             cd_txt = cd_font.render(f"Power Jump CD: {cd_left:.1f}s", True, (130, 130, 240))
             screen.blit(cd_txt, (SCREEN_WIDTH - cd_txt.get_width() - 18, 18))
@@ -468,15 +527,16 @@ def game_loop():
 
     return score
 
+
 def show_game_over(score):
     bg_img = pygame.transform.scale(START_BG, (SCREEN_WIDTH, SCREEN_HEIGHT))
-    button_rect = pygame.Rect(SCREEN_WIDTH//2 - 110, SCREEN_HEIGHT//2 + 80, 220, 50)
+    button_rect = pygame.Rect(SCREEN_WIDTH // 2 - 110, SCREEN_HEIGHT // 2 + 80, 220, 50)
     waiting = True
 
     overlay_width = 360
     overlay_height = 240
     overlay_x = SCREEN_WIDTH // 2 - overlay_width // 2
-    overlay_y = SCREEN_HEIGHT//2 - 120
+    overlay_y = SCREEN_HEIGHT // 2 - 120
 
     overlay = pygame.Surface((overlay_width, overlay_height), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 170))
@@ -498,14 +558,15 @@ def show_game_over(score):
         screen.blit(over_text, (text_x, text_y))
 
         score_text = font.render(f"Twój wynik: {score}", True, WHITE)
-        screen.blit(score_text, (SCREEN_WIDTH//2 - score_text.get_width()//2, SCREEN_HEIGHT//2 - 40))
+        screen.blit(score_text, (SCREEN_WIDTH // 2 - score_text.get_width() // 2, SCREEN_HEIGHT // 2 - 40))
 
         highscore_text = font.render(f"Najlepszy wynik: {highscore}", True, (255, 215, 0))
-        screen.blit(highscore_text, (SCREEN_WIDTH//2 - highscore_text.get_width()//2, SCREEN_HEIGHT//2))
+        screen.blit(highscore_text, (SCREEN_WIDTH // 2 - highscore_text.get_width() // 2, SCREEN_HEIGHT // 2))
 
         if new_highscore:
             new_record_text = font.render("NOWY REKORD!", True, (255, 215, 0))
-            screen.blit(new_record_text, (SCREEN_WIDTH//2 - new_record_text.get_width()//2, SCREEN_HEIGHT//2 + 40))
+            screen.blit(new_record_text,
+                        (SCREEN_WIDTH // 2 - new_record_text.get_width() // 2, SCREEN_HEIGHT // 2 + 40))
 
         draw_button("Zagraj ponownie", button_rect, mouse_pos)
         pygame.display.flip()
@@ -520,10 +581,11 @@ def show_game_over(score):
 
 
 def main():
-    show_start_screen()
     while True:
-        score = game_loop()
+        selected_char = show_start_screen()
+        score = game_loop(selected_char)
         show_game_over(score)
+
 
 if __name__ == '__main__':
     main()
