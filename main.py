@@ -13,8 +13,8 @@ GAME_BG = pygame.image.load(os.path.join('assets', 'background', 'platform_backg
 PLAYER_WIDTH = 60
 PLAYER_HEIGHT = 60
 PLATFORM_WIDTH = 80
-PLATFORM_HEIGHT = 18
-PLATFORM_IMG = pygame.image.load(os.path.join('assets', 'background', 'platform.png'))
+PLATFORM_HEIGHT = 31
+PLATFORM_IMG = pygame.image.load(os.path.join('assets', 'background', 'platform123.png'))
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 PLATFORM_COLOR = (50, 200, 50)
@@ -111,7 +111,6 @@ def show_start_screen():
 
         # Tytuł
         screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 60))
-        screen.blit(subtitle, (SCREEN_WIDTH // 2 - subtitle.get_width() // 2, 120))
 
         # Czarny overlay pod tekst
         overlay_y = 200
