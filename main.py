@@ -6,6 +6,7 @@ import os
 # --- Stałe ---
 SCREEN_WIDTH = 500
 SCREEN_HEIGHT = 800
+BACKGROUND_IMG = pygame.image.load(os.path.join('assets', 'background', 'platform_background.png'))
 PLAYER_WIDTH = 60
 PLAYER_HEIGHT = 60
 PLATFORM_WIDTH = 80
@@ -245,7 +246,7 @@ def game_loop():
             running = False
 
         player.update()
-        screen.fill(WHITE)
+        screen.blit(BACKGROUND_IMG, (0, 0))  # Draw background first
         all_sprites.draw(screen)
         # Wynik (większy, niebieskawy)
         score_text = score_font.render(f"Wynik: {score}", True, (40, 80, 220))
