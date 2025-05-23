@@ -6,7 +6,10 @@ import os
 # --- Stałe ---
 SCREEN_WIDTH = 500
 SCREEN_HEIGHT = 800
-BACKGROUND_IMG = pygame.image.load(os.path.join('assets', 'background', 'platform_background.png'))
+
+START_BG = pygame.image.load(os.path.join('assets', 'background', 'altum.png'))
+GAME_BG = pygame.image.load(os.path.join('assets', 'background', 'platform_background.png'))
+
 PLAYER_WIDTH = 60
 PLAYER_HEIGHT = 60
 PLATFORM_WIDTH = 80
@@ -25,23 +28,23 @@ PLATFORM_MAX_DIST = 140
 
 OBSTACLE_WIDTH = 48
 OBSTACLE_HEIGHT = 48
-OBSTACLE_CHANCE_PER_FRAME = 0.003  # Mniej przeszkód!
+OBSTACLE_CHANCE_PER_FRAME = 0.003
 
-POWER_JUMP_CD = 5.0  # sekundy
-POWER_JUMP_STRENGTH = -20  # dwa razy większy skok
+POWER_JUMP_CD = 5.0
+POWER_JUMP_STRENGTH = -20
 
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Endless Jumper")
 clock = pygame.time.Clock()
-# Font loader z fallbackami
+
 def get_font(name_list, size, bold=False):
     for name in name_list:
         try:
             return pygame.font.SysFont(name, size, bold=bold)
         except:
             continue
-    return pygame.font.SysFont('arial', size, bold=bold)  # ostatnia deska ratunku
+    return pygame.font.SysFont('arial', size, bold=bold)
 
 NICE_FONTS = [
     'Fira Sans', 'Nunito', 'Montserrat', 'Comic Sans MS', 'Verdana', 'Arial'
@@ -49,10 +52,10 @@ NICE_FONTS = [
 
 font = get_font(NICE_FONTS, 28)
 big_font = get_font(NICE_FONTS, 48, bold=True)
-alert_font = get_font(NICE_FONTS, 18, bold=True)  # komunikat o cooldownie 2x mniejszy i ładniejszy
+alert_font = get_font(NICE_FONTS, 18, bold=True)
 score_font = get_font(NICE_FONTS, 32, bold=True)
 cd_font = get_font(NICE_FONTS, 24, bold=True)
-
+desc_font = get_font(NICE_FONTS, 23)
 
 def load_image(path, size):
     img = pygame.image.load(path).convert_alpha()
@@ -60,6 +63,71 @@ def load_image(path, size):
 
 SPIRIT_IMG = load_image(os.path.join('assets', 'hero', 'hero_spirit.png'), (PLAYER_WIDTH, PLAYER_HEIGHT))
 JUMP_IMG = load_image(os.path.join('assets', 'hero', 'hero_jump.png'), (PLAYER_WIDTH, PLAYER_HEIGHT))
+
+def draw_button(text, rect, mouse_pos):
+    color = BUTTON_HOVER if rect.collidepoint(mouse_pos) else BUTTON_COLOR
+    pygame.draw.rect(screen, color, rect, border_radius=10)
+    label = font.render(text, True, BLACK)
+    label_rect = label.get_rect(center=rect.center)
+    screen.blit(label, label_rect)
+
+def draw_alert(text):
+    center_x = SCREEN_WIDTH // 2
+    y = 80
+    msg = alert_font.render(text, True, (220, 0, 0))
+    screen.blit(msg, (center_x - msg.get_width() // 2, y))
+
+# --- Start screen ---
+def show_start_screen():
+    bg_img = pygame.transform.scale(START_BG, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    title = big_font.render("ENDLESS JUMPER", True, (30, 40, 200))
+    welcome_lines = [
+        "Doskocz jak najwyżej.",
+        "Unikaj spadających wind.",
+        "Sterowanie:",
+        "  strzałki — poruszanie się",
+        "  SPACJA — Power Jump (co 5 sek.)",
+        "Kliknij START, aby rozpocząć!"
+    ]
+    button_rect = pygame.Rect(SCREEN_WIDTH//2 - 100, SCREEN_HEIGHT//2 + 130, 200, 54)
+    waiting = True
+
+    # Przygotuj przezroczysty overlay pod tekst instrukcji
+    overlay_height = len(welcome_lines) * 36 + 30
+    overlay = pygame.Surface((SCREEN_WIDTH - 80, overlay_height), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 170))  # Ciemny, lekko przezroczysty
+
+    while waiting:
+        mouse_pos = pygame.mouse.get_pos()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if button_rect.collidepoint(mouse_pos):
+                    waiting = False
+
+        screen.blit(bg_img, (0, 0))
+
+        # Tytuł
+        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 60))
+        screen.blit(subtitle, (SCREEN_WIDTH // 2 - subtitle.get_width() // 2, 120))
+
+        # Czarny overlay pod tekst
+        overlay_y = 200
+        screen.blit(overlay, (40, overlay_y - 12))
+
+        # Instrukcje
+        y = overlay_y
+        for line in welcome_lines:
+            rendered = desc_font.render(line, True, (240, 240, 240))
+            screen.blit(rendered, (SCREEN_WIDTH // 2 - rendered.get_width() // 2, y))
+            y += 36
+
+        draw_button("START", button_rect, mouse_pos)
+
+        pygame.display.flip()
+        clock.tick(60)
 
 class Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -110,7 +178,7 @@ class Obstacle(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = -OBSTACLE_HEIGHT
-        self.speed = random.randint(3, 5)  # WOLNIEJSZE!
+        self.speed = random.randint(3, 5)
 
     def update(self):
         self.rect.y += self.speed
@@ -135,19 +203,6 @@ def move_screen(player, platforms, obstacles, score):
         for obs in obstacles:
             obs.rect.y += int(offset)
     return score
-
-def draw_button(text, rect, mouse_pos):
-    color = BUTTON_HOVER if rect.collidepoint(mouse_pos) else BUTTON_COLOR
-    pygame.draw.rect(screen, color, rect, border_radius=10)
-    label = font.render(text, True, BLACK)
-    label_rect = label.get_rect(center=rect.center)
-    screen.blit(label, label_rect)
-
-def draw_alert(text):
-    center_x = SCREEN_WIDTH // 2
-    y = 80
-    msg = alert_font.render(text, True, (220, 0, 0))
-    screen.blit(msg, (center_x - msg.get_width() // 2, y))
 
 def game_loop():
     player = Player()
@@ -203,15 +258,12 @@ def game_loop():
             new_platform = add_next_platform(platforms)
             all_sprites.add(new_platform)
 
-        # Losowe przeszkody - z ochroną głowy, gdy gracz jest wysoko
         if random.random() < OBSTACLE_CHANCE_PER_FRAME:
             if player.rect.top < SCREEN_HEIGHT // 4:
-                # Safe zone: szerokość gracza + bufor
                 safe_margin = 30
                 safe_left = max(0, player.rect.left - safe_margin)
                 safe_right = min(SCREEN_WIDTH, player.rect.right + safe_margin)
                 possible_ranges = []
-                # Dodajemy tylko zakresy z sensem!
                 if safe_left > 0:
                     left_range = (0, safe_left - OBSTACLE_WIDTH)
                     if left_range[1] > left_range[0]:
@@ -226,7 +278,6 @@ def game_loop():
                     obstacle = Obstacle(obs_x)
                     obstacles.add(obstacle)
                     all_sprites.add(obstacle)
-                # Jak nie ma gdzie wrzucić, nie spawnujemy przeszkody
             else:
                 obs_x = random.randint(0, SCREEN_WIDTH - OBSTACLE_WIDTH)
                 obstacle = Obstacle(obs_x)
@@ -246,9 +297,8 @@ def game_loop():
             running = False
 
         player.update()
-        screen.blit(BACKGROUND_IMG, (0, 0))  # Draw background first
+        screen.blit(GAME_BG, (0, 0))  # GAME background (platform_background)
         all_sprites.draw(screen)
-        # Wynik (większy, niebieskawy)
         score_text = score_font.render(f"Wynik: {score}", True, (40, 80, 220))
         screen.blit(score_text, (14, 14))
 
@@ -262,22 +312,19 @@ def game_loop():
             if current_time - cooldown_msg_timer > 1.0:
                 show_cooldown_msg = False
 
-        if show_cooldown_msg:
-            draw_alert("POWER JUMP NA COOLDOWNIE!")
-            if current_time - cooldown_msg_timer > 1.0:
-                show_cooldown_msg = False
-
         pygame.display.flip()
 
     return score
 
 def show_game_over(score):
+    # --- Altum tło na ekranie końca gry ---
+    bg_img = pygame.transform.scale(START_BG, (SCREEN_WIDTH, SCREEN_HEIGHT))
     button_rect = pygame.Rect(SCREEN_WIDTH//2 - 110, SCREEN_HEIGHT//2 + 30, 220, 50)
     waiting = True
 
     while waiting:
         mouse_pos = pygame.mouse.get_pos()
-        screen.fill(WHITE)
+        screen.blit(bg_img, (0, 0))
         over_text = big_font.render("KONIEC GRY", True, (200, 0, 0))
         score_text = font.render(f"Twój wynik: {score}", True, BLACK)
         screen.blit(over_text, (SCREEN_WIDTH//2 - over_text.get_width()//2, SCREEN_HEIGHT//2 - 90))
@@ -294,6 +341,7 @@ def show_game_over(score):
                     waiting = False
 
 def main():
+    show_start_screen()
     while True:
         score = game_loop()
         show_game_over(score)
