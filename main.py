@@ -386,6 +386,7 @@ def game_loop():
 def show_game_over(score):
     bg_img = pygame.transform.scale(START_BG, (SCREEN_WIDTH, SCREEN_HEIGHT))
     button_rect = pygame.Rect(SCREEN_WIDTH//2 - 110, SCREEN_HEIGHT//2 + 80, 220, 50)  
+    waiting = True
 
     overlay_width = 360
     overlay_height = 240 
@@ -395,7 +396,6 @@ def show_game_over(score):
     overlay = pygame.Surface((overlay_width, overlay_height), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 170)) 
     
-    # Aktualizuj najwyższy wynik
     new_highscore = save_highscore(score)
     highscore = load_highscore()
 
@@ -403,28 +403,21 @@ def show_game_over(score):
         mouse_pos = pygame.mouse.get_pos()
         screen.blit(bg_img, (0, 0))
 
-        # Czarny overlay pod napisem
         screen.blit(overlay, (overlay_x, overlay_y))
 
-        # Renderuj cień i główny tekst KONIEC GRY
         over_text = big_font.render("KONIEC GRY", True, (200, 0, 0))
         shadow = big_font.render("KONIEC GRY", True, (0, 0, 0))
         text_x = SCREEN_WIDTH // 2 - over_text.get_width() // 2
-        text_y = SCREEN_HEIGHT // 2 - 110  # Moved text up
-        # Cień
+        text_y = SCREEN_HEIGHT // 2 - 110
         screen.blit(shadow, (text_x + 3, text_y + 3))
-        # Tekst
         screen.blit(over_text, (text_x, text_y))
 
-        # Wynik
         score_text = font.render(f"Twój wynik: {score}", True, WHITE)
         screen.blit(score_text, (SCREEN_WIDTH//2 - score_text.get_width()//2, SCREEN_HEIGHT//2 - 40))
         
-        # Najwyższy wynik
         highscore_text = font.render(f"Najlepszy wynik: {highscore}", True, (255, 215, 0))
         screen.blit(highscore_text, (SCREEN_WIDTH//2 - highscore_text.get_width()//2, SCREEN_HEIGHT//2))
         
-        # Komunikat o nowym rekordzie
         if new_highscore:
             new_record_text = font.render("NOWY REKORD!", True, (255, 215, 0))
             screen.blit(new_record_text, (SCREEN_WIDTH//2 - new_record_text.get_width()//2, SCREEN_HEIGHT//2 + 40))
