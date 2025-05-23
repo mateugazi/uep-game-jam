@@ -11,6 +11,7 @@ PLAYER_WIDTH = 60
 PLAYER_HEIGHT = 60
 PLATFORM_WIDTH = 80
 PLATFORM_HEIGHT = 18
+PLATFORM_IMG = pygame.image.load(os.path.join('assets', 'background', 'platform.png'))
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 PLATFORM_COLOR = (50, 200, 50)
@@ -96,8 +97,7 @@ class Player(pygame.sprite.Sprite):
 class Platform(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        self.image = pygame.Surface((PLATFORM_WIDTH, PLATFORM_HEIGHT))
-        self.image.fill(PLATFORM_COLOR)
+        self.image = PLATFORM_IMG
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
